@@ -1,46 +1,13 @@
-
 const bodyparser = require("body-parser")
 const mongoose = require("mongoose")
 const express = require("express")
 const fs = require("fs")
 const { setInterval } = require("timers")
 const app = express()
-const xmpp_app = express()
-const PORT = process.env.PORT || 3000;
 
 const logging = require(`${__dirname}/structs/logs`)
 const config = require(`${__dirname}/config.json`)
 
-const xmlparser = require('xml-parser')
-const xmlbuilder = require("xmlbuilder")
-const Client = require("./xmpp/Client")
-const WebSocket = require('ws');
-
-const Friends = require(`${__dirname}/./model/Friends`)
-
-const wss = new WebSocket.Server({port:443, app});
-
-
-wss.on("connection", ws => {
-    var client = new Client(ws) 
-
-    ws.on("close", async (lol) => {
-        client.ws.send(xmlbuilder.create({
-            "close": {
-                "xmlns": "urn:ietf:params:xml:ns:xmpp-framing"
-            }
-        }))
-
-        if (client.sender) {
-            clearInterval(client.sender)
-        }
-        if (xmppClients[client.id]) delete xmppClients[client.id]
-    })
-})
-
-wss.on("error", ws => {})
-
-app.use(require(`${__dirname}/routes/services/xmpphost`))
 
 //i know global isn't the best practice, but it works good enough
 global.exchangeCodes = {}
@@ -54,25 +21,15 @@ global.pings = []
 app.use(bodyparser.json())
 app.use(bodyparser.urlencoded({extended: true}))
 
+require("./xmpp")
+
 //db
-mongoose.connect("mongodb://GD:Tjlovetj12@cluster0-shard-00-00.j2kbj.mongodb.net:27017,cluster0-shard-00-01.j2kbj.mongodb.net:27017,cluster0-shard-00-02.j2kbj.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-13grh5-shard-0&authSource=admin&retryWrites=true&w=majority", { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: true}, async e => {
+mongoose.connect(config.db, { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: true}, async e => {
     if (e) throw e
     logging.fdev(`Connected to Mongo DB`)
 })
 
 app.use(require(`${__dirname}/routes`))
-
-//services
-app.use("/waitingroom", require(`${__dirname}/routes/services/waitingroom`))
-app.use("/lightswitch", require(`${__dirname}/routes/services/lightswitch`))
-app.use("/datarouter", require(`${__dirname}/routes/services/datarouter`))
-app.use("/fortnite", require(`${__dirname}/routes/services/fortnite`))
-app.use("/presence", require(`${__dirname}/routes/services/presence`))
-app.use("/content", require(`${__dirname}/routes/services/content`))
-app.use("/account", require(`${__dirname}/routes/services/account`))
-app.use("/friends", require(`${__dirname}/routes/services/friends`))
-app.use("/party", require(`${__dirname}/routes/services/party`))
-app.use(require(`${__dirname}/routes/services/misc`))
 
 setInterval(() => {
     parties.forEach(party => {
@@ -95,8 +52,23 @@ setInterval(() => {
     })
 }, 3000)
 
+//gets the services working n shit
+app.use("/waitingroom", require(`${__dirname}/routes/services/waitingroom`))
+app.use("/lightswitch", require(`${__dirname}/routes/services/lightswitch`))
+app.use("/datarouter", require(`${__dirname}/routes/services/datarouter`))
+app.use("/fortnite", require(`${__dirname}/routes/services/fortnite`))
+app.use("/presence", require(`${__dirname}/routes/services/presence`))
+app.use("/content", require(`${__dirname}/routes/services/content`))
+app.use("/account", require(`${__dirname}/routes/services/account`))
+app.use("/friends", require(`${__dirname}/routes/services/friends`))
+app.use("/party", require(`${__dirname}/routes/services/party`))
+app.use(require(`${__dirname}/routes/services/misc`))
+
+global.launcherversion = fs.readFileSync(`${__dirname}/public/files/version`).toString()
 global.serverversion = "1.5"
 
-app.listen(PORT, () => {
-    logging.fdev(`Listening on port \x1b[36m${process.env.port}`)
+app.listen(process.env.port || config.port || 80, () => {
+    logging.fdev(`Created by Slushia and Cyuubi, Version \x1b[36m${serverversion}`)
+    logging.fdev(`Listening on port \x1b[36m${process.env.port || config.port || 80}`)
+    logging.fdev(`XMPP listening on port \x1b[36m${process.env.xmppPort || config.xmppPort || 443}`)
 })
